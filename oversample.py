@@ -10,6 +10,7 @@ import pandas as pd
 import torch
 from imblearn.over_sampling import SMOTE
 from imblearn.over_sampling import SVMSMOTE
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import SVC
 
 from gan import Discriminator
@@ -18,11 +19,7 @@ from gan import predict as gan_predict
 from gan import train as gan_train
 
 
-def oversampling(data_path: str,
-                 sampling_method: str,
-                 ratio_by_label: dict,
-                 rand_seed: int = 0,
-                 **kwargs) -> dict:
+def oversampling(data_path: str, sampling_method: str, ratio_by_label: dict, rand_seed: int = 0, **kwargs) -> dict:
     """
     Function to load the csv data file and over-sample the minority data.
 
@@ -40,18 +37,15 @@ def oversampling(data_path: str,
     """
     assert isinstance(data_path, str)
     assert isinstance(sampling_method, str)
-    assert sampling_method.lower() in ["smote", "smote_svm", "gan"]
+    assert sampling_method.lower() in ["smote", "smote_borderline", "smote_kmeans", "smote_svm", "adasyn", "gan"]
     assert isinstance(ratio_by_label, dict)
     assert isinstance(rand_seed, int) and rand_seed > 0
-
-    sampling_method = sampling_method.lower()
-
-    # Set the seed for generating random numbers.
-    np.random.seed(seed=rand_seed)
 
     if not os.path.exists(data_path):
         raise FileNotFoundError(data_path)
     assert (os.path.splitext(data_path)[1]).lower() == ".csv"
+
+    sampling_method = sampling_method.lower()
 
     smote_k_neighbors: int = 5
     if "smote_k_neighbors" in kwargs:
@@ -73,6 +67,12 @@ def oversampling(data_path: str,
         assert isinstance(kwargs["gan_num_hidden_layers"], int) and (kwargs["gan_num_hidden_layers"] >= 1)
         gan_num_hidden_layers = kwargs["gan_num_hidden_layers"]
 
+    # Set the seed for generating random numbers.
+    numpy_random_state_previous: tuple = np.random.get_state()
+    torch_random_state_previous: torch.ByteTensor = torch.get_rng_state()
+    np.random.seed(seed=rand_seed)
+    torch.manual_seed(seed=rand_seed)
+
     # Load the dataset.
     data_df: pd.DataFrame = pd.read_csv(data_path, delimiter=',')
     data_np: np.ndarray = data_df.values
@@ -85,12 +85,12 @@ def oversampling(data_path: str,
     sampling_strategy: dict = dict()
     for (label, ratio) in ratio_by_label.items():
         label, ratio = int(label), float(ratio)
-        assert ratio > 1.0
-        if label in y_stats:
-            number_by_label[label] = int(y_stats[label] * (ratio - 1.0))
-            sampling_strategy[label] = int(y_stats[label] * ratio)
-        else:
-            raise RuntimeError("{0} class is not in {1}.".format(label, data_path))
+        if ratio > 0.0:
+            if label in y_stats:
+                number_by_label[label] = int(y_stats[label] * ratio)
+                sampling_strategy[label] = int(y_stats[label] * (ratio + 1.0))
+            else:
+                raise RuntimeError("{0} class is not in {1}.".format(label, data_path))
 
     if sampling_method == "smote":
         smote: SMOTE = SMOTE(sampling_strategy=sampling_strategy,
@@ -106,38 +106,42 @@ def oversampling(data_path: str,
         new_x, new_y = smote.fit_resample(x, y)
         new_x, new_y = new_x[len(x):], new_y[len(y):]
     elif sampling_method == "gan":
-        batch_size: int = 1024
+        batch_size: int = 128
         num_epochs: int = 100
         run_device: str = "cpu"
-        if torch.cuda.is_available():
-            run_device = "cuda"
-        learning_rate: float = 0.0001
-        beta_1: float = 0.9
+        # run_device: str = "cuda"
+        learning_rate: float = 0.0002
+        beta_1: float = 0.5
         beta_2: float = 0.999
+        random_state: torch.Tensor = torch.get_rng_state().clone()
+
+        scaler: MinMaxScaler = MinMaxScaler(feature_range=(-1.0, 1.0))
+        x_scaled: np.ndarray = scaler.fit_transform(x)
 
         generator: Generator = Generator(size_latent=gan_size_latent,
                                          size_labels=len(y_stats.keys()),
                                          num_hidden_layers=gan_num_hidden_layers,
                                          size_outputs=x.shape[1])
-        discriminator: Generator = Discriminator(size_inputs=x.shape[1],
-                                                 size_labels=len(y_stats.keys()),
-                                                 num_hidden_layers=gan_num_hidden_layers)
-        trained_G, trained_D = gan_train(generator=generator,
-                                         discriminator=discriminator,
-                                         x=torch.as_tensor(x, dtype=torch.float32),
-                                         y=torch.as_tensor(y, dtype=torch.long),
-                                         latent_size=gan_size_latent,
-                                         batch_size=batch_size,
-                                         num_epochs=num_epochs,
-                                         run_device=run_device,
-                                         learning_rate=learning_rate,
-                                         beta_1=beta_1, beta_2=beta_2,
-                                         rand_seed=rand_seed,
-                                         verbose=False)
+        discriminator: Discriminator = Discriminator(size_inputs=x.shape[1],
+                                                     size_labels=len(y_stats.keys()),
+                                                     num_hidden_layers=gan_num_hidden_layers)
+        trained_G, trained_D, trained_R = gan_train(generator=generator,
+                                                    discriminator=discriminator,
+                                                    x=torch.as_tensor(x_scaled, dtype=torch.float32),
+                                                    y=torch.as_tensor(y, dtype=torch.long),
+                                                    latent_size=gan_size_latent,
+                                                    batch_size=batch_size,
+                                                    num_epochs=num_epochs,
+                                                    run_device=run_device,
+                                                    learning_rate=learning_rate,
+                                                    beta_1=beta_1, beta_2=beta_2,
+                                                    random_state=random_state,
+                                                    verbose=False)
         new_x, new_y = gan_predict(generator=trained_G, discriminator=trained_D,
                                    latent_size=gan_size_latent, output_by_label=number_by_label,
                                    run_device=run_device,
-                                   rand_seed=rand_seed)
+                                   random_state=trained_R)
+        new_x = scaler.inverse_transform(new_x)
     else:
         raise ValueError()
 
@@ -145,6 +149,9 @@ def oversampling(data_path: str,
     for (label, number) in number_by_label.items():
         sample_by_label[label] = (new_x[:number], new_y[:number])
         new_x, new_y = new_x[number:], new_y[number:]
+
+    np.random.set_state(numpy_random_state_previous)
+    torch.set_rng_state(torch_random_state_previous)
 
     return sample_by_label
 

@@ -37,7 +37,7 @@ def load_dataset(data_path: str,
     assert isinstance(data_path, str)
     if sampling_method:
         assert isinstance(sampling_method, str)
-        assert sampling_method.lower() in ["smote", "smote_borderline", "smote_svm", "adasyn", "gan"]
+        assert sampling_method.lower() in ["smote", "smote_borderline", "smote_kmeans", "smote_svm", "adasyn", "gan"]
         if ratio_by_label:
             assert isinstance(ratio_by_label, dict)
         assert isinstance(samples_dir, str)
@@ -93,11 +93,11 @@ def load_dataset(data_path: str,
         number_by_label: dict = dict()
         for (label, ratio) in ratio_by_label.items():
             label, ratio = int(label), float(ratio)
-            assert ratio > 1.0
-            if label in y_stats:
-                number_by_label[label] = int(y_stats[label] * (ratio - 1.0))
-            else:
-                raise RuntimeError("{0} class is not in {1}.".format(label, data_path))
+            if ratio > 0.0:
+                if label in y_stats:
+                    number_by_label[label] = int(y_stats[label] * ratio)
+                else:
+                    raise RuntimeError("{0} class is not in {1}.".format(label, data_path))
 
         sample_path: str = ""
         if sampling_method == "smote":
@@ -106,24 +106,11 @@ def load_dataset(data_path: str,
                                        "k_neighbors={0}".format(smote_k_neighbors),
                                        "ratio_by_label={0}".format(str(MAX_RATIO_BY_LABEL)),
                                        "sample_by_label.pkl")
-        elif sampling_method == "smote_borderline":
-            sample_path = os.path.join(samples_dir,
-                                       sampling_method,
-                                       "k_neighbors={0}".format(smote_k_neighbors),
-                                       "borderline_kind={0}".format(smote_borderline_kind),
-                                       "ratio_by_label={0}".format(str(MAX_RATIO_BY_LABEL)),
-                                       "sample_by_label.pkl")
         elif sampling_method == "smote_svm":
             sample_path = os.path.join(samples_dir,
                                        sampling_method,
                                        "k_neighbors={0}".format(smote_k_neighbors),
                                        "svm_kernel={0}".format(smote_svm_kernel),
-                                       "ratio_by_label={0}".format(str(MAX_RATIO_BY_LABEL)),
-                                       "sample_by_label.pkl")
-        elif sampling_method == "adasyn":
-            sample_path = os.path.join(samples_dir,
-                                       sampling_method,
-                                       "n_neighbors={0}".format(adasyn_n_neighbors),
                                        "ratio_by_label={0}".format(str(MAX_RATIO_BY_LABEL)),
                                        "sample_by_label.pkl")
         elif sampling_method == "gan":
@@ -178,15 +165,9 @@ def parse_args():
     parser.add_argument("--smote-k-neighbors", type=int, default=5, required=False,
                         help="Parameter k_neighbors of SMOTE.",
                         dest="smote_k_neighbors")
-    parser.add_argument("--smote-borderline-kind", type=str, default="borderline-1", required=False,
-                        help="Parameter borderline_kind of BorderlineSMOTE.",
-                        dest="smote_borderline_kind")
     parser.add_argument("--smote-svm-kernel", type=str, default="linear", required=False,
                         help="Parameter svm_kernel of SVMSMOTE.",
                         dest="smote_svm_kernel")
-    parser.add_argument("--adasyn-n-neighbors", type=int, default=5, required=False,
-                        help="Parameter n_neighbors of ADASYN.",
-                        dest="adasyn_n_neighbors")
     parser.add_argument("--gan-size-latent", type=int, default=100, required=False,
                         help="Parameter size_latent of GAN.",
                         dest="gan_size_latent")
@@ -234,9 +215,7 @@ if __name__ == "__main__":
     RATIO_BY_LABEL: dict = args.ratio_by_label
     SAMPLES_DIR: str = args.samples_dir
     SMOTE_K_NEIGHBORS: int = args.smote_k_neighbors
-    SMOTE_BORDERLINE_KIND: str = args.smote_borderline_kind
     SMOTE_SVM_KERNEL: str = args.smote_svm_kernel
-    ADASYN_N_NEIGHBORS: int = args.adasyn_n_neighbors
     GAN_SIZE_LATENT: int = args.gan_size_latent
     GAN_NUM_HIDDEN_LAYERS: int = args.gan_num_hidden_layers
     MODEL_PATH: str = args.model_save_path
@@ -267,23 +246,23 @@ if __name__ == "__main__":
     assert isinstance(VERBOSE, bool)
 
     np.random.seed(seed=RAND_SEED)
-    torch_random_generator = torch.manual_seed(seed=RAND_SEED)
+    torch.manual_seed(seed=RAND_SEED)
 
     numpy_random_state = np.random.get_state()
-    torch_random_state = torch_random_generator.get_state()
+    torch_random_state = torch.get_rng_state()
 
     x, y = load_dataset(data_path=TRAIN_DATA_PATH,
                         sampling_method=SAMPLING_METHOD,
                         ratio_by_label=RATIO_BY_LABEL,
                         samples_dir=SAMPLES_DIR,
                         smote_k_neighbors=SMOTE_K_NEIGHBORS,
-                        smote_borderline_kind=SMOTE_BORDERLINE_KIND,
                         smote_svm_kernel=SMOTE_SVM_KERNEL,
-                        adasyn_n_neighbors=ADASYN_N_NEIGHBORS,
                         gan_size_latent=GAN_SIZE_LATENT,
                         gan_num_hidden_layers=GAN_NUM_HIDDEN_LAYERS)
     size_features: int = x.size(1)
     size_labels: int = int(y.max().item() - y.min().item()) + 1
+
+    test_x, test_y = load_dataset(data_path=TRAIN_DATA_PATH)
 
     # Train a classifiers and save the classifiers.
     classifier: torch.nn.Module = DNNClassifier(size_features=size_features,
@@ -292,6 +271,8 @@ if __name__ == "__main__":
     trained_classifier, trained_random_state = train(classifier=classifier,
                                                      x=x,
                                                      y=y,
+                                                     test_x=test_x,
+                                                     test_y=test_y,
                                                      batch_size=BATCH_SIZE,
                                                      num_epochs=NUM_EPOCHS,
                                                      run_device=RUN_DEVICE,

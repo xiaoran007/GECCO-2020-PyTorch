@@ -22,7 +22,7 @@ class DNNClassifier(torch.nn.Module):
         assert isinstance(num_hidden_layers, int) and (num_hidden_layers > 0)
         assert isinstance(size_labels, int) and (size_labels > 0)
 
-        list_num_nodes: list = torch.linspace(start=size_features,
+        list_num_nodes: list = torch.linspace(start=size_features * 4,
                                               end=size_labels,
                                               steps=num_hidden_layers + 2,
                                               requires_grad=False).int().tolist()[1:-1]

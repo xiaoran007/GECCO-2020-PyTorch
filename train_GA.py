@@ -13,9 +13,10 @@ import torch
 from classifiers import DNNClassifier
 from classifiers import save_model
 from classifiers import train
+from ga import load_checkpoint
 
 
-def load_data_with_samples(data_path: str, samples_dir: str, individual: list) -> tuple:
+def load_data_with_samples(data_path: str, samples_dir: str = None, individual: list = None) -> tuple:
     """
     Function to load the csv data file.
 
@@ -31,8 +32,10 @@ def load_data_with_samples(data_path: str, samples_dir: str, individual: list) -
 
     """
     assert isinstance(data_path, str) and os.path.exists(data_path)
-    assert isinstance(samples_dir, str) and os.path.exists(samples_dir)
-    assert isinstance(individual, list)
+    if samples_dir is not None:
+        assert isinstance(samples_dir, str) and os.path.exists(samples_dir)
+        if individual is not None:
+            assert isinstance(individual, list)
 
     assert (os.path.splitext(data_path)[1]).lower() == ".csv"
 
@@ -43,28 +46,29 @@ def load_data_with_samples(data_path: str, samples_dir: str, individual: list) -
     x_np: np.ndarray = data_np[:, 0:-1]
     y_np: np.ndarray = data_np[:, -1]
 
-    list_sample_file: list = glob.glob(os.path.join(samples_dir, "**", "*.pkl"), recursive=True)
-    list_sample_file.sort()
+    if (samples_dir is not None) and (individual is not None):
+        list_sample_file: list = glob.glob(os.path.join(samples_dir, "**", "*.pkl"), recursive=True)
+        list_sample_file.sort()
 
-    list_sample_by_label: list = list()
-    for sample_file in list_sample_file:
-        with open(os.path.join(sample_file), mode="rb") as fp:
-            list_sample_by_label.append(pickle.load(fp))
+        list_sample_by_label: list = list()
+        for sample_file in list_sample_file:
+            with open(os.path.join(sample_file), mode="rb") as fp:
+                list_sample_by_label.append(pickle.load(fp))
 
-    y_stats: dict = Counter(y_np)
-    list_label: list = list(list_sample_by_label[0].keys())
+        y_stats: dict = Counter(y_np)
+        list_label: list = list(list_sample_by_label[0].keys())
 
-    for (i, ratio_by_label) in enumerate(individual):
-        label: int = list_label[i]
-        for (j, ratio_by_method) in enumerate(ratio_by_label):
-            method: int = j
-            if ratio_by_method > 0.0:
-                number: int = int(y_stats[label] * ratio_by_method)
-                new_x: np.ndarray = list_sample_by_label[method][label][0][:number]
-                new_y: np.ndarray = list_sample_by_label[method][label][1][:number]
+        for (i, ratio_by_label) in enumerate(individual):
+            label: int = list_label[i]
+            for (j, ratio_by_method) in enumerate(ratio_by_label):
+                method: int = j
+                if ratio_by_method > 0.0:
+                    number: int = int(y_stats[label] * ratio_by_method)
+                    new_x: np.ndarray = list_sample_by_label[method][label][0][:number]
+                    new_y: np.ndarray = list_sample_by_label[method][label][1][:number]
 
-                x_np = np.concatenate([x_np, new_x], axis=0)
-                y_np = np.concatenate([y_np, new_y], axis=0)
+                    x_np = np.concatenate([x_np, new_x], axis=0)
+                    y_np = np.concatenate([y_np, new_y], axis=0)
 
     x_tensor: torch.Tensor = torch.as_tensor(x_np, dtype=torch.float)
     y_tensor: torch.Tensor = torch.as_tensor(y_np, dtype=torch.long)
@@ -80,6 +84,9 @@ def parse_args():
     parser.add_argument("--samples-dir", type=str, default=None, required=False,
                         help="Directory path of store samples.",
                         dest="samples_dir")
+    parser.add_argument("--ga-checkpoint-path", type=str, required=True,
+                        help="File path to checkpoint of GA.",
+                        dest="ga_checkpoint_path")
     parser.add_argument("--model-save-path", type=str, required=True,
                         help="File path to store a trained classifiers model.",
                         dest="model_save_path")
@@ -118,6 +125,7 @@ if __name__ == "__main__":
 
     TRAIN_DATA_PATH: str = args.train_data_path
     SAMPLES_DIR: str = args.samples_dir
+    GA_CHECKPOINT_PATH: str = args.ga_checkpoint_path
     MODEL_PATH: str = args.model_save_path
     NUM_HIDDEN_LAYERS: int = args.num_hidden_layers
     BATCH_SIZE: int = args.batch_size
@@ -138,6 +146,9 @@ if __name__ == "__main__":
     if os.path.exists(MODEL_PATH):
         raise FileExistsError(MODEL_PATH)
 
+    if not os.path.exists(GA_CHECKPOINT_PATH):
+        raise FileNotFoundError(GA_CHECKPOINT_PATH)
+
     assert isinstance(NUM_HIDDEN_LAYERS, int) and (NUM_HIDDEN_LAYERS > 0)
     assert isinstance(BATCH_SIZE, int) and (BATCH_SIZE > 0)
     assert isinstance(NUM_EPOCHS, int) and (NUM_EPOCHS > 0)
@@ -149,18 +160,24 @@ if __name__ == "__main__":
     assert isinstance(VERBOSE, bool)
 
     np.random.seed(seed=RAND_SEED)
-    torch_random_generator = torch.manual_seed(seed=RAND_SEED)
+    torch.manual_seed(seed=RAND_SEED)
 
     numpy_random_state = np.random.get_state()
-    torch_random_state = torch_random_generator.get_state()
+    torch_random_state = torch.get_rng_state()
 
-    individual: list = [[]]
+    checkpoint: dict = load_checkpoint(load_path=GA_CHECKPOINT_PATH)
+
+    population: list = checkpoint["population"]
+
+    individual: list = population[0].base.tolist()
 
     x, y = load_data_with_samples(data_path=TRAIN_DATA_PATH,
                                   samples_dir=SAMPLES_DIR,
                                   individual=individual)
     size_features: int = x.size(1)
     size_labels: int = int(y.max().item() - y.min().item()) + 1
+
+    test_x, test_y = load_data_with_samples(data_path=TRAIN_DATA_PATH)
 
     # Train a classifiers and save the classifiers.
     classifier = DNNClassifier(size_features=size_features,
@@ -169,6 +186,8 @@ if __name__ == "__main__":
     trained_classifier, trained_random_state = train(classifier=classifier,
                                                      x=x,
                                                      y=y,
+                                                     test_x=test_x,
+                                                     test_y=test_y,
                                                      batch_size=BATCH_SIZE,
                                                      num_epochs=NUM_EPOCHS,
                                                      run_device=RUN_DEVICE,

@@ -14,7 +14,7 @@ def calculate_f1_score(individual: np.ndarray,
                        x: torch.Tensor,
                        y: torch.Tensor,
                        list_sample_by_label: list,
-                       random_state: torch.Tensor = None,
+                       random_state: torch.ByteTensor = torch.get_rng_state().clone(),
                        **kwargs) -> Tuple:
     """
     Function to calculate fitness.
@@ -25,7 +25,7 @@ def calculate_f1_score(individual: np.ndarray,
     x: torch.Tensor
     y: torch.Tensor
     list_sample_by_label: list
-    random_state: torch.Tensor
+    random_state: torch.ByteTensor
 
     Returns
     -------
@@ -36,8 +36,7 @@ def calculate_f1_score(individual: np.ndarray,
     assert isinstance(x, torch.Tensor)
     assert isinstance(y, torch.Tensor)
     assert isinstance(list_sample_by_label, list)
-    if random_state is not None:
-        assert isinstance(random_state, torch.Tensor)
+    assert isinstance(random_state, torch.ByteTensor)
 
     classifier_num_hidden_layers: int = 1
     if "classifier_num_hidden_layers" in kwargs:
@@ -75,6 +74,9 @@ def calculate_f1_score(individual: np.ndarray,
         assert isinstance(kwargs["classifier_beta_2"], float) and (0.0 <= kwargs["classifier_beta_2"] < 1.0)
         classifier_beta_2 = kwargs["classifier_beta_2"]
 
+    # Set the seed for generating random numbers.
+    torch.set_rng_state(random_state)
+
     size_features: int = x.size(1)
     size_labels: int = int(y.max().item() - y.min().item()) + 1
 
@@ -97,19 +99,24 @@ def calculate_f1_score(individual: np.ndarray,
                 train_x = torch.cat([train_x, new_x], dim=0)
                 train_y = torch.cat([train_y, new_y], dim=0)
 
+    test_x: torch.Tensor = x.clone()
+    test_y: torch.Tensor = y.clone()
+
     classifier: torch.nn.Module = DNNClassifier(size_features=size_features,
                                                 num_hidden_layers=classifier_num_hidden_layers,
                                                 size_labels=size_labels)
     trained_classifier, trained_random_state = classifier_train(classifier=classifier,
                                                                 x=train_x,
                                                                 y=train_y,
+                                                                test_x=test_x,
+                                                                test_y=test_y,
                                                                 batch_size=classifier_batch_size,
                                                                 num_epochs=classifier_num_epochs,
                                                                 run_device=classifier_run_device,
                                                                 learning_rate=classifier_learning_rate,
                                                                 beta_1=classifier_beta_1,
                                                                 beta_2=classifier_beta_2,
-                                                                random_state=random_state,
+                                                                random_state=torch.get_rng_state().clone(),
                                                                 verbose=False)
     f1_score: np.ndarray = classifier_evaluate(classifier=trained_classifier,
                                                x=x,
@@ -119,4 +126,4 @@ def calculate_f1_score(individual: np.ndarray,
                                                random_state=trained_random_state,
                                                verbose=False)
 
-    return tuple(f1_score.tolist(), )
+    return np.mean(f1_score),

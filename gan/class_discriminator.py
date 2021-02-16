@@ -28,10 +28,10 @@ class Discriminator(torch.nn.Module):
 
         size_validity: int = 1
 
-        list_num_nodes: list = torch.linspace(start=size_inputs + size_labels,
-                                              end=size_validity,
-                                              steps=num_hidden_layers + 2,
-                                              requires_grad=False).int().tolist()[1:-1]
+        list_num_nodes: list = torch.linspace(start=int(256 * num_hidden_layers),
+                                              end=256,
+                                              steps=num_hidden_layers,
+                                              requires_grad=False).int().tolist()
 
         self._embedding: torch.nn.Embedding = torch.nn.Embedding(size_labels, size_labels)
 
@@ -40,16 +40,18 @@ class Discriminator(torch.nn.Module):
         for (i, o) in zip([size_inputs + size_labels] + list_num_nodes[:-1], list_num_nodes):
             self._nn.add_module(name="linear_{0}".format(idx),
                                 module=torch.nn.Linear(in_features=i, out_features=o, bias=True))
-            self._nn.add_module(name="relu_{0}".format(idx),
-                                module=torch.nn.ReLU(inplace=True))
+            self._nn.add_module(name="leakyrelu_{0}".format(idx),
+                                module=torch.nn.LeakyReLU(negative_slope=0.2, inplace=True))
             idx = idx + 1
         self._nn.add_module(name="linear_{0}".format(idx),
                             module=torch.nn.Linear(in_features=list_num_nodes[-1],
                                                    out_features=size_validity,
                                                    bias=True))
+        self._nn.add_module(name="sigmoid",
+                            module=torch.nn.Sigmoid())
 
     def forward(self, x: torch.Tensor, labels: torch.Tensor, **kwargs):
         """Function to perform computation."""
-        x = torch.cat((x, self._embedding(labels)), dim=-1)
+        x_embed: torch.Tensor = torch.cat((x, self._embedding(labels)), dim=-1)
 
-        return self._nn(x)
+        return self._nn(x_embed)

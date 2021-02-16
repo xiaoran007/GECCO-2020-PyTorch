@@ -1,5 +1,7 @@
 """Module containing the functions."""
 import functools
+import os
+import pickle
 import random
 
 import numpy as np
@@ -23,19 +25,18 @@ from .func_replacement import replacement_parents_worse
 from .func_replacement import replacement_worst
 
 
-def generate_individual(ratio_min: float = 1.0,
-                        ratio_max: float = 1.1,
+def generate_individual(ratio_min: float = 0.0,
+                        ratio_max: float = 0.1,
                         num_sampling_methods: int = 1,
                         num_sampling_labels: int = 1) -> np.ndarray:
-    assert isinstance(ratio_min, float) and (ratio_min >= 1.0)
+    assert isinstance(ratio_min, float) and (ratio_min >= 0.0)
     assert isinstance(ratio_max, float) and (ratio_max > ratio_min)
     assert isinstance(num_sampling_methods, int) and (num_sampling_methods >= 1)
     assert isinstance(num_sampling_labels, int) and (num_sampling_labels >= 1)
 
-    ratio_sum: float = np.random.uniform(low=ratio_min, high=ratio_max, size=(num_sampling_labels, 1))
-    alpha: np.ndarray = np.random.randint(low=1, high=11, size=num_sampling_methods)
-    individual: np.ndarray = np.random.dirichlet(alpha=alpha,
-                                                 size=num_sampling_labels) * ratio_sum
+    ratio: float = np.random.uniform(low=ratio_min, high=ratio_max + 0.000001, size=(num_sampling_labels, 1))
+    alpha: np.ndarray = np.ones(shape=(num_sampling_methods,), dtype=np.int)
+    individual: np.ndarray = np.random.dirichlet(alpha=alpha, size=num_sampling_labels) * ratio
 
     return np.asarray(individual, dtype=np.float32)
 
@@ -43,8 +44,8 @@ def generate_individual(ratio_min: float = 1.0,
 def run(x: torch.Tensor,
         y: torch.Tensor,
         list_sample_by_label: list,
-        ratio_min: float = 1.0,
-        ratio_max: float = 1.1,
+        ratio_min: float = 0.0,
+        ratio_max: float = 0.1,
         population_size: int = 4,
         selection_method: str = "roulette",
         crossover_method: str = "onepoint",
@@ -60,7 +61,7 @@ def run(x: torch.Tensor,
     assert isinstance(x, torch.Tensor)
     assert isinstance(y, torch.Tensor)
     assert isinstance(list_sample_by_label, list)
-    assert isinstance(ratio_min, float) and (ratio_min >= 1.0)
+    assert isinstance(ratio_min, float) and (ratio_min >= 0.0)
     assert isinstance(ratio_max, float) and (ratio_max > ratio_min)
     assert isinstance(population_size, int) and (population_size > 0)
     assert isinstance(selection_method, str)
@@ -76,7 +77,7 @@ def run(x: torch.Tensor,
     assert isinstance(num_generations, int) and num_generations >= 1
     if checkpoint_dir is not None:
         assert isinstance(checkpoint_dir, str)
-    assert isinstance(rand_seed, int) and rand_seed > 0
+    assert isinstance(rand_seed, int) and (rand_seed >= 0)
     assert isinstance(verbose, bool)
 
     # Parameters for NN-based classifier.
@@ -117,18 +118,21 @@ def run(x: torch.Tensor,
         classifier_beta_2 = kwargs["classifier_beta_2"]
 
     # Set the seed for generating random numbers.
+    random_state_previous: tuple = random.getstate()
+    numpy_random_state_previous: tuple = np.random.get_state()
+    torch_random_state_previous: torch.ByteTensor = torch.get_rng_state().clone()
+
     random.seed(a=rand_seed)
     np.random.seed(seed=rand_seed)
     torch.manual_seed(seed=rand_seed)
 
-    checkpoint_save: bool = False
-    checkpoint_path_template: str = os.path.join(checkpoint_dir, "generation={0}", "checkpoint.pkl")
-    if checkpoint_dir is not None:
-        checkpoint_save = True
-        if not os.path.exists(checkpoint_dir):
-            os.makedirs(checkpoint_dir)
+    if checkpoint_dir is None:
+        checkpoint_dir = ".{}-checkpoints".format(os.getpid())
 
-    size_labels: int = int(y.max().item() - y.min().item()) + 1
+    if not os.path.exists(checkpoint_dir):
+        os.makedirs(checkpoint_dir)
+
+    checkpoint_path_template = os.path.join(checkpoint_dir, "generation={0}", "checkpoint.pkl")
 
     assert isinstance(list_sample_by_label[0], dict)
     num_sampling_methods: int = len(list_sample_by_label)
@@ -141,7 +145,7 @@ def run(x: torch.Tensor,
                                                  num_sampling_methods=num_sampling_methods,
                                                  num_sampling_labels=num_sampling_labels)
 
-    creator.create(name="FitnessMax", base=base.Fitness, weights=tuple([1.0 for _ in range(size_labels)]))
+    creator.create(name="FitnessMax", base=base.Fitness, weights=(1.0,))
     creator.create(name="Individual", base=np.ndarray, fitness=creator.FitnessMax)
 
     toolbox = base.Toolbox()
@@ -153,10 +157,10 @@ def run(x: torch.Tensor,
                      container=list, func=toolbox.individual)
 
     toolbox.register(alias="evaluate", function=calculate_f1_score,
-                     x=x,
-                     y=y,
+                     x=x.clone(),
+                     y=y.clone(),
                      list_sample_by_label=list_sample_by_label,
-                     random_state=torch.get_rng_state(),
+                     random_state=torch.get_rng_state().clone(),
                      classifier_num_hidden_layers=classifier_num_hidden_layers,
                      classifier_batch_size=classifier_batch_size,
                      classifier_num_epochs=classifier_num_epochs,
@@ -220,14 +224,15 @@ def run(x: torch.Tensor,
         raise ValueError()
 
     stats = tools.Statistics(lambda ind: ind.fitness.values)
-    stats.register("min", np.min, axis=0)
-    stats.register("max", np.max, axis=0)
-    stats.register("mean", np.mean, axis=0)
-    stats.register("std", np.std, axis=0)
+    stats.register("min", np.min)
+    stats.register("max", np.max)
+    stats.register("mean", np.mean)
+    stats.register("std", np.std)
 
     logbook = tools.Logbook()
     logbook.header = ["gen", "num_evals"] + (stats.fields if stats else [])
 
+    # Generation: 0
     generation: int = 0
     population = toolbox.population(n=population_size)
     halloffame = tools.HallOfFame(population_size, similar=np.array_equal)
@@ -242,9 +247,8 @@ def run(x: torch.Tensor,
         halloffame.update(population)
         population[:] = halloffame[:]
 
-    if checkpoint_save:
-        checkpoint_path: str = checkpoint_path_template.format(generation)
-        save_checkpoint(population=population, save_path=checkpoint_path)
+    checkpoint_path: str = checkpoint_path_template.format(generation)
+    save_checkpoint(population=population, save_path=checkpoint_path)
 
     record = stats.compile(population) if stats else {}
     logbook.record(gen=0, num_evals=len(invalid_individual), **record)
@@ -281,15 +285,18 @@ def run(x: torch.Tensor,
             halloffame.update(population)
             population[:] = halloffame[:]
 
-        if checkpoint_save:
-            checkpoint_path: str = checkpoint_path_template.format(generation)
-            save_checkpoint(population=population, save_path=checkpoint_path)
+        checkpoint_path: str = checkpoint_path_template.format(generation)
+        save_checkpoint(population=population, save_path=checkpoint_path)
 
         # Append the current generation statistics to the logbook
         record = stats.compile(population) if stats else {}
         logbook.record(gen=generation, num_evals=len(invalid_individual), **record)
         if verbose:
             print(logbook.stream)
+
+    random.setstate(random_state_previous)
+    np.random.set_state(numpy_random_state_previous)
+    torch.set_rng_state(torch_random_state_previous)
 
     return population, logbook
 
@@ -321,7 +328,7 @@ def save_checkpoint(population: list, save_path: str) -> bool:
         "population": population,
         "random_state": random.getstate(),
         "numpy_random_state": np.random.get_state(),
-        "torch_random_state": torch.get_rng_state()
+        "torch_random_state": torch.get_rng_state().clone()
     }
 
     with open(save_path, mode="wb") as fp:

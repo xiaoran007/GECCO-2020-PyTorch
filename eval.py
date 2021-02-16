@@ -50,12 +50,12 @@ def parse_args():
     parser.add_argument("--eval-data-path", type=str, required=True,
                         help="File path of a eval data.",
                         dest="eval_data_path")
-    parser.add_argument("--metric", type=str, default="f1_score", required=False,
-                        help="Evaluation metrics.",
-                        dest="metric")
     parser.add_argument("--model-load-path", type=str, required=True,
                         help="File path to store a trained classifiers model.",
                         dest="model_load_path")
+    parser.add_argument("--metric", type=str, default="f1_score", required=False,
+                        help="Evaluation metrics.",
+                        dest="metric")
     parser.add_argument("--run-device", type=str, default="cpu", required=False,
                         help="Running device for PyTorch.",
                         dest="run_device")
@@ -69,8 +69,8 @@ if __name__ == "__main__":
     args = parse_args()
 
     EVAL_DATASET_PATH: str = args.eval_data_path
-    METRIC: str = args.metric
     MODEL_PATH: str = args.model_load_path
+    METRIC: str = args.metric
     RUN_DEVICE: str = args.run_device
     VERBOSE: bool = args.verbose
 

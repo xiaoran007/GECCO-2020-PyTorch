@@ -4,7 +4,6 @@ import argparse
 import glob
 import os
 import pickle
-from pprint import pprint
 
 import numpy as np
 import pandas as pd
@@ -80,10 +79,10 @@ def parse_args():
     parser.add_argument("--samples-dir", type=str, default=None, required=True,
                         help="Directory path of store samples.",
                         dest="samples_dir")
-    parser.add_argument("--ratio-min", type=float, default=1.0, required=False,
+    parser.add_argument("--ratio-min", type=float, default=0.0, required=False,
                         help="Minimum ratio for oversampling.",
                         dest="ratio_min")
-    parser.add_argument("--ratio-max", type=float, default=1.1, required=False,
+    parser.add_argument("--ratio-max", type=float, default=0.1, required=False,
                         help="Maximum ratio for oversampling.",
                         dest="ratio_max")
     parser.add_argument("--ga-population-size", type=int, default=4, required=False,
@@ -169,6 +168,8 @@ if __name__ == '__main__':
     RAND_SEED: int = args.rand_seed
     VERBOSE: bool = args.verbose
 
+    assert isinstance(RATIO_MIN, float) and (RATIO_MIN >= 0.0)
+    assert isinstance(RATIO_MAX, float) and (RATIO_MAX > RATIO_MIN)
     assert isinstance(GA_POPULATION_SIZE, int) and (GA_POPULATION_SIZE > 0)
     assert isinstance(GA_SELECTION_METHOD, str)
     assert isinstance(GA_CROSSOVER_METHOD, str)
