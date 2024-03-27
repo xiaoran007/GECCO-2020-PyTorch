@@ -108,8 +108,8 @@ def oversampling(data_path: str, sampling_method: str, ratio_by_label: dict, ran
     elif sampling_method == "gan":
         batch_size: int = 128
         num_epochs: int = 100
-        run_device: str = "cpu"
-        # run_device: str = "cuda"
+        # run_device: str = "cpu"
+        run_device: str = "cuda"
         learning_rate: float = 0.0002
         beta_1: float = 0.5
         beta_2: float = 0.999
