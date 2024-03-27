@@ -136,11 +136,11 @@ def oversampling(data_path: str, sampling_method: str, ratio_by_label: dict, ran
                                                     learning_rate=learning_rate,
                                                     beta_1=beta_1, beta_2=beta_2,
                                                     random_state=random_state,
-                                                    verbose=False)
+                                                    verbose=True)
         new_x, new_y = gan_predict(generator=trained_G, discriminator=trained_D,
                                    latent_size=gan_size_latent, output_by_label=number_by_label,
                                    run_device=run_device,
-                                   random_state=trained_R)
+                                   random_state=trained_R, verbose=True)
         new_x = scaler.inverse_transform(new_x)
     else:
         raise ValueError()
