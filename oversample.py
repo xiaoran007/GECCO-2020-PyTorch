@@ -95,14 +95,14 @@ def oversampling(data_path: str, sampling_method: str, ratio_by_label: dict, ran
     if sampling_method == "smote":
         smote: SMOTE = SMOTE(sampling_strategy=sampling_strategy,
                              random_state=rand_seed,
-                             k_neighbors=smote_k_neighbors)
+                             k_neighbors=smote_k_neighbors, n_jobs=-1)
         new_x, new_y = smote.fit_resample(x, y)
         new_x, new_y = new_x[len(x):], new_y[len(y):]
     elif sampling_method == "smote_svm":
         smote: SVMSMOTE = SVMSMOTE(sampling_strategy=sampling_strategy,
                                    random_state=rand_seed,
                                    k_neighbors=smote_k_neighbors,
-                                   svm_estimator=SVC(kernel=smote_svm_kernel))
+                                   svm_estimator=SVC(kernel=smote_svm_kernel), n_jobs=-1)
         new_x, new_y = smote.fit_resample(x, y)
         new_x, new_y = new_x[len(x):], new_y[len(y):]
     elif sampling_method == "gan":
