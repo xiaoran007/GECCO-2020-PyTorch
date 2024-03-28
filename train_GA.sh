@@ -5,7 +5,8 @@ declare TRAIN_DATA_PATH="./Datasets/${DATA_NAME}/train.csv"
 declare SAMPLES_DIR="./Samples/${DATA_NAME}"
 
 declare GA_CHECKPOINT_NAME="Test_1"
-declare GA_CHECKPOINT_PATH="./GA-Checkpoints/${DATA_NAME}/${GA_CHECKPOINT_NAME}/generation=100/checkpoint.pkl"
+#declare GA_CHECKPOINT_PATH="./GA-Checkpoints/${DATA_NAME}/${GA_CHECKPOINT_NAME}/generation=100/checkpoint.pkl"
+declare GA_CHECKPOINT_PATH="./GA-Checkpoints/generation=100/checkpoint.pkl"
 
 declare MODEL_SAVE_PATH="./Trained-Classifiers/${DATA_NAME}/ga/${GA_CHECKPOINT_NAME}/classifier.pth"
 
