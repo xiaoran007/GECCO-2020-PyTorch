@@ -289,8 +289,12 @@ def run(x: torch.Tensor,
         print('Evaluate the individuals with an invalid fitness')
         invalid_individual = [individual for individual in offspring if not individual.fitness.valid]
         list_fitness = toolbox.map(toolbox.evaluate, invalid_individual)
+        eva_len_second = len(invalid_individual)
+        eva_second = 0
         for (individual, fitness) in zip(invalid_individual, list_fitness):
             individual.fitness.values = fitness
+            print(f'Evaluate round {eva_second}/{eva_len_second}')
+            eva_second += 1
 
         # Apply replacement
         population = toolbox.replace(population=population, parents=parents, offspring=offspring)
