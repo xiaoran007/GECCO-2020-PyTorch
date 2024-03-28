@@ -198,7 +198,7 @@ if __name__ == '__main__':
 
     size_features: int = train_x.size(1)
     size_labels: int = int(train_y.max().item() - train_y.min().item()) + 1
-
+    print(VERBOSE)
     population, logbook = ga.run(x=train_x,
                                  y=train_y,
                                  list_sample_by_label=list_sample_by_label,
