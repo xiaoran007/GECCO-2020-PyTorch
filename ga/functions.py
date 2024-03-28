@@ -247,10 +247,11 @@ def run(x: torch.Tensor,
     print('Evaluate the individuals with an invalid fitness')
     invalid_individual: list = [individual for individual in population if not individual.fitness.valid]
     list_fitness = toolbox.map(toolbox.evaluate, invalid_individual)
+    eva_len = len(invalid_individual)
     eva = 0
     for (individual, fitness) in zip(invalid_individual, list_fitness):
         individual.fitness.values = fitness
-        print(f'Evaluate round {eva}')
+        print(f'Evaluate round {eva}/{eva_len}')
         eva += 1
 
     if halloffame is not None:
