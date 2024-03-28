@@ -5,7 +5,8 @@ declare EVAL_DATA_PATH="./Datasets/${DATA_NAME}/eval.csv"
 declare MODEL_LOAD_DIR="./Trained-Classifiers/${DATA_NAME}"
 
 declare METRIC="f1_score"
-declare CLASSIFIER_RUN_DEVICE="cpu"
+#declare CLASSIFIER_RUN_DEVICE="cpu"
+declare CLASSIFIER_RUN_DEVICE="cuda"
 
 declare -a LIST_RATIO_BY_LABEL=("1=1.0" "1=2.0" "1=3.0" "1=4.0" "1=5.0")
 
