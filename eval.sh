@@ -57,3 +57,10 @@ for size_latent in ${list_size_latent[@]}; do
         done
     done
 done
+
+# Evaluate GA
+python3 eval.py \
+    --eval-data-path "${EVAL_DATA_PATH}" \
+    --model-load-path "${MODEL_LOAD_DIR}/ga/Test_1/classifier.pth" \
+    --metric "${METRIC}" \
+    --run-device "${CLASSIFIER_RUN_DEVICE}"
