@@ -283,7 +283,7 @@ def predict(classifier: torch.nn.Module,
         predict_y: torch.Tensor = output.detach().cpu().argmax(dim=1, keepdim=True)
 
     torch.set_rng_state(random_state_previous)
-
+    print(predict_y.numpy())
     return predict_y.numpy()
 
 
