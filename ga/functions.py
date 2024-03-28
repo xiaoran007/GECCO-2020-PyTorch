@@ -118,6 +118,7 @@ def run(x: torch.Tensor,
         classifier_beta_2 = kwargs["classifier_beta_2"]
 
     # Set the seed for generating random numbers.
+    print('Set the seed for generating random numbers.')
     random_state_previous: tuple = random.getstate()
     numpy_random_state_previous: tuple = np.random.get_state()
     torch_random_state_previous: torch.ByteTensor = torch.get_rng_state().clone()
@@ -139,6 +140,7 @@ def run(x: torch.Tensor,
     num_sampling_labels: int = len(list_sample_by_label[0].keys())
 
     # Set a genetic algorithm.
+    print('Set a genetic algorithm.')
     func_generate_individual = functools.partial(generate_individual,
                                                  ratio_min=ratio_min,
                                                  ratio_max=ratio_max,
@@ -170,6 +172,7 @@ def run(x: torch.Tensor,
                      classifier_beta_2=classifier_beta_2)
 
     # Selection
+    print('Selection')
     selection_method = selection_method.lower()
     if selection_method == "roulette":
         toolbox.register(alias="select", function=tools.selRoulette)
@@ -185,6 +188,7 @@ def run(x: torch.Tensor,
         raise ValueError()
 
     # Crossover
+    print('Crossover')
     crossover_method = crossover_method.lower()
     if crossover_method == "onepoint":
         toolbox.register(alias="mate", function=crossover_onepoint)
@@ -198,6 +202,7 @@ def run(x: torch.Tensor,
         raise ValueError()
 
     # Mutation
+    print('Mutation')
     mutation_method = mutation_method.lower()
     if mutation_method == "swap":
         toolbox.register(alias="mutate", function=mutation_swap)
@@ -209,6 +214,7 @@ def run(x: torch.Tensor,
         raise ValueError()
 
     # Replacement
+    print('Replacement')
     replacement_method = replacement_method.lower()
     if replacement_method == "parents":
         toolbox.register(alias="replace", function=replacement_parents)
@@ -238,6 +244,7 @@ def run(x: torch.Tensor,
     halloffame = tools.HallOfFame(population_size, similar=np.array_equal)
 
     # Evaluate the individuals with an invalid fitness
+    print('Evaluate the individuals with an invalid fitness')
     invalid_individual: list = [individual for individual in population if not individual.fitness.valid]
     list_fitness = toolbox.map(toolbox.evaluate, invalid_individual)
     for (individual, fitness) in zip(invalid_individual, list_fitness):
@@ -256,13 +263,16 @@ def run(x: torch.Tensor,
         print(logbook.stream)
 
     # Begin the generational process
+    print('Begin the generational process')
     for generation in range(1, num_generations + 1):
         # Select the next generation individuals
+        print(f'Generation round {generation}')
         parents = toolbox.select(population, k=crossover_size)
         offspring = [toolbox.clone(individual) for individual in parents]
 
         # Apply crossover and mutation on the offspring
         for i in range(1, len(offspring), 2):
+            print(f'crossover and mutation on the offspring {i}')
             offspring[i - 1], offspring[i] = toolbox.mate(offspring[i - 1], offspring[i])
             del offspring[i - 1].fitness.values, offspring[i].fitness.values
 
@@ -272,6 +282,7 @@ def run(x: torch.Tensor,
                 offspring[i], = toolbox.mutate(offspring[i])
 
         # Evaluate the individuals with an invalid fitness
+        print('Evaluate the individuals with an invalid fitness')
         invalid_individual = [individual for individual in offspring if not individual.fitness.valid]
         list_fitness = toolbox.map(toolbox.evaluate, invalid_individual)
         for (individual, fitness) in zip(invalid_individual, list_fitness):
@@ -289,6 +300,7 @@ def run(x: torch.Tensor,
         save_checkpoint(population=population, save_path=checkpoint_path)
 
         # Append the current generation statistics to the logbook
+        print('Append the current generation statistics to the logbook')
         record = stats.compile(population) if stats else {}
         logbook.record(gen=generation, num_evals=len(invalid_individual), **record)
         if verbose:

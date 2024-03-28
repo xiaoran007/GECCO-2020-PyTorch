@@ -190,6 +190,8 @@ if __name__ == '__main__':
     assert isinstance(RAND_SEED, int) and (RAND_SEED >= 0)
     assert isinstance(VERBOSE, bool)
 
+    print(f"Verbose set to: {VERBOSE}")
+
     np.random.seed(seed=RAND_SEED)
     torch.manual_seed(seed=RAND_SEED)
 
@@ -198,7 +200,7 @@ if __name__ == '__main__':
 
     size_features: int = train_x.size(1)
     size_labels: int = int(train_y.max().item() - train_y.min().item()) + 1
-    print(VERBOSE)
+    print('Starting GA...')
     population, logbook = ga.run(x=train_x,
                                  y=train_y,
                                  list_sample_by_label=list_sample_by_label,
