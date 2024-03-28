@@ -4,6 +4,47 @@
 
 The experimental codes using PyTorch from the [paper](https://github.com/hwyncho/GECCO-2020-Paper) that was submitted to [GECCO 2020](https://gecco-2020.sigevo.org/index.html/HomePage). (https://doi.org/10.1145/3377929.3398153)
 
+## Tested Env settings
+### OS
+- Ubuntu 18.04 kernel 5.15.0
+- Python 3.7
+
+### Dependencies (use miniconda)
+- PyTorch 1.4.0 cu10.1 (pytorch)
+- scikit-learn 1.0.2 (conda)
+- pandas 1.3.5 (conda)
+- DEAP 1.4.1 (pip)
+- imbalanced-learn 0.7.0 (pip)
+
+Setup:
+```shell
+conda create -n GECCO python=3.7
+conda activate GECCO
+conda install pytorch==1.4.0 cudatoolkit=10.1 -c pytorch
+conda install pandas=1.3.5 scikit-learn=1.0.2
+python -m pip install deap==1.4.1 imbalanced-learn==0.7.0
+```
+
+### Datasets
+1. Setup git-lfs, download from git-lfs website
+2. Inside project root dir, fetch datasets:
+```shell
+git lfs fetch
+git lfs pull
+```
+(May need initialize project)
+```shell
+git lfs install
+```
+
+
+
+
+
+
+
+
+# Old md
 ## Getting Started
 
 ### Environments
