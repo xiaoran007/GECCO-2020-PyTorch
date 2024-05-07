@@ -152,12 +152,21 @@ def run(x: torch.Tensor,
 
     toolbox = base.Toolbox()
 
+    """
+        Set individual. Part of Solution Encoding.
+    """
     toolbox.register(alias="individual", function=tools.initIterate,
                      container=creator.Individual, generator=func_generate_individual)
 
+    """
+        Set population, use list of individuals. Part of Solution Encoding.
+    """
     toolbox.register(alias="population", function=tools.initRepeat,
                      container=list, func=toolbox.individual)
 
+    """
+        Set Fitness function. Implemented by F1-score.
+    """
     toolbox.register(alias="evaluate", function=calculate_f1_score,
                      x=x.clone(),
                      y=y.clone(),
@@ -172,6 +181,9 @@ def run(x: torch.Tensor,
                      classifier_beta_2=classifier_beta_2)
 
     # Selection
+    """
+        Set selection function.
+    """
     print('Selection')
     selection_method = selection_method.lower()
     if selection_method == "roulette":
@@ -188,6 +200,9 @@ def run(x: torch.Tensor,
         raise ValueError()
 
     # Crossover
+    """
+        Set crossover function. Part of Generation.
+    """
     print('Crossover')
     crossover_method = crossover_method.lower()
     if crossover_method == "onepoint":
@@ -202,6 +217,9 @@ def run(x: torch.Tensor,
         raise ValueError()
 
     # Mutation
+    """
+        Set mutation function. Part of Generation.
+    """
     print('Mutation')
     mutation_method = mutation_method.lower()
     if mutation_method == "swap":
@@ -214,6 +232,9 @@ def run(x: torch.Tensor,
         raise ValueError()
 
     # Replacement
+    """
+        Set replacement function. Part of Replacement.
+    """
     print('Replacement')
     replacement_method = replacement_method.lower()
     if replacement_method == "parents":
@@ -297,6 +318,9 @@ def run(x: torch.Tensor,
             eva_second += 1
 
         # Apply replacement
+        """
+            New generation
+        """
         population = toolbox.replace(population=population, parents=parents, offspring=offspring)
 
         # Update the hall of fame with the generated individuals
