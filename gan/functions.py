@@ -100,6 +100,7 @@ def train(generator: torch.nn.Module,
     net_g.train()
     net_d.train()
     for epoch in range(1, num_epochs + 1):
+        i = 0
         start_time: float = time.time()
         for (_, batch) in enumerate(dataloader, 0):
             batch_x, batch_y = batch
@@ -145,6 +146,10 @@ def train(generator: torch.nn.Module,
             optimizer_g.zero_grad()
             loss_g.backward(retain_graph=True)
             optimizer_g.step()
+
+            # Print
+            print(f"epoch: {epoch}, inner: {i} loss_g: {loss_g.item()}, loss_d: {loss_d.item()}")
+            i += 1
         end_time: float = time.time()
 
         if verbose:
